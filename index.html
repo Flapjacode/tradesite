@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CryptoTrade Social - Trade Together, Win Together</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"></script>
+  <script src="https://plugin.jup.ag/plugin-v1.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0e27; color: #fff; }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .tradingview-widget-container { height: 600px; }
+    .tradingview-widget-container__widget { height: 100% !important; }
+    .signal-long { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .signal-short { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .hover-lift { transition: transform 0.2s, box-shadow 0.2s; }
+    .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    .notification { position: fixed; top: 80px; right: 20px; z-index: 1000; animation: slideIn 0.3s ease-out; }
+    @keyframes slideIn { from { transform: translateX(400px); } to { transform: translateX(0); } }
+    .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+    .tab-active { border-bottom: 3px solid #667eea; color: #667eea; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
+    .modal.show { display: flex; }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-gold { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #000; }
+    .badge-silver { background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%); color: #000; }
+    .badge-bronze { background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%); color: #fff; }
+  </style>
+</head>
+<body>
+  
+  <!-- Navigation -->
+  <nav class="glass sticky top-0 z-50 border-b border-gray-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-8">
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center text-white font-bold">CT</div>
+            <span class="text-xl font-bold hidden sm:block">CryptoTrade Social</span>
+          </div>
+          <div id="mainNav" class="hidden md:flex space-x-6">
+            <a href="#" onclick="showSection('dashboard')" class="text-gray-300 hover:text-white transition">Dashboard</a>
+            <a href="#" onclick="showSection('signals')" class="text-gray-300 hover:text-white transition">Signals</a>
+            <a href="#" onclick="showSection('community')" class="text-gray-300 hover:text-white transition">Community</a>
+            <a href="#" onclick="showSection('leaderboard')" class="text-gray-300 hover:text-white transition">Leaderboard</a>
+          </div>
+        </div>
+        <div id="authNav" class="flex items-center space-x-4">
+          <span id="loadingAuth" class="text-gray-400 text-sm">Loading...</span>
+          <div id="userNav" class="hidden flex items-center space-x-3">
+            <button onclick="showNotifications()" class="relative p-2 hover:bg-white/10 rounded-lg transition">
+              <span class="text-xl">🔔</span>
+              <span id="notifBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">0</span>
+            </button>
+            <div class="avatar gradient-bg cursor-pointer" onclick="showSection('profile')" id="userAvatar">U</div>
+            <button onclick="logout()" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition text-sm">Logout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Auth Section -->
+  <div id="authSection" class="min-h-screen flex items-center justify-center p-4">
+    <div class="glass rounded-2xl p-8 max-w-4xl w-full">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 gradient-bg rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">CT</div>
+        <h1 class="text-3xl font-bold mb-2">Welcome to CryptoTrade Social</h1>
+        <p class="text-gray-400">Trade together, share signals, and grow your portfolio</p>
+      </div>
+      
+      <div class="grid md:grid-cols-2 gap-8">
+        <!-- Login -->
+        <div>
+          <h3 class="text-xl font-semibold mb-4">Login</h3>
+          <form id="loginForm" class="space-y-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">Username</label>
+              <input type="text" id="loginUsername" required class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition" placeholder="Enter username">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">Password</label>
+              <input type="password" id="loginPassword" required class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition" placeholder="Enter password">
+            </div>
+            <button type="submit" class="w-full py-3 gradient-bg rounded-lg font-semibold hover:opacity-90 transition">Login</button>
+            <div id="loginError" class="hidden text-red-400 text-sm"></div>
+          </form>
+        </div>
+
+        <!-- Register -->
+        <div>
+          <h3 class="text-xl font-semibold mb-4">Register</h3>
+          <form id="registerForm" class="space-y-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">Username</label>
+              <input type="text" id="regUsername" required class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition" placeholder="Choose username">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">Email</label>
+              <input type="email" id="regEmail" required class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition" placeholder="Your email">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">Password</label>
+              <input type="password" id="regPassword" required class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition" placeholder="Create password">
+            </div>
+            <button type="submit" class="w-full py-3 bg-green-600 rounded-lg font-semibold hover:bg-green-700 transition">Register</button>
+            <div id="registerError" class="hidden text-red-400 text-sm"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="mainApp" class="hidden">
+    <!-- Dashboard Section -->
+    <div id="dashboardSection" class="max-w-7xl mx-auto px-4 py-8">
+      <div class="mb-8">
+        <h2 class="text-3xl font-bold mb-2">Trading Dashboard</h2>
+        <p class="text-gray-400">Real-time market data and analysis</p>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="glass rounded-xl p-6 hover-lift">
+          <div class="text-gray-400 text-sm mb-2">Portfolio Value</div>
+          <div class="text-2xl font-bold">$0.00</div>
+          <div class="text-green-400 text-sm mt-2">+0.0%</div>
+        </div>
+        <div class="glass rounded-xl p-6 hover-lift">
+          <div class="text-gray-400 text-sm mb-2">Active Signals</div>
+          <div class="text-2xl font-bold" id="activeSignalsCount">0</div>
+          <div class="text-purple-400 text-sm mt-2">Following</div>
+        </div>
+        <div class="glass rounded-xl p-6 hover-lift">
+          <div class="text-gray-400 text-sm mb-2">Win Rate</div>
+          <div class="text-2xl font-bold">0%</div>
+          <div class="text-blue-400 text-sm mt-2">Last 30 days</div>
+        </div>
+        <div class="glass rounded-xl p-6 hover-lift">
+          <div class="text-gray-400 text-sm mb-2">Followers</div>
+          <div class="text-2xl font-bold" id="followersCount">0</div>
+          <div class="text-yellow-400 text-sm mt-2">Community</div>
+        </div>
+      </div>
+
+      <!-- Chart & Swap -->
+      <div class="grid lg:grid-cols-3 gap-6 mb-8">
+        <div class="lg:col-span-2 glass rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold">Live Chart</h3>
+            <select id="pairSelector" class="px-4 py-2 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none">
+              <option value="COINBASE:SOLUSD">Solana (SOL)</option>
+              <option value="BITSTAMP:BTCUSD">Bitcoin (BTC)</option>
+              <option value="COINBASE:ETHUSD">Ethereum (ETH)</option>
+              <option value="BINANCE:XRPUSDT">Ripple (XRP)</option>
+            </select>
+          </div>
+          <div class="tradingview-widget-container">
+            <div class="tradingview-widget-container__widget"></div>
+          </div>
+        </div>
+
+        <div class="glass rounded-xl p-6">
+          <h3 class="text-xl font-semibold mb-4">Quick Swap</h3>
+          <div id="jupiter-container" style="min-height: 500px;"></div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-xl font-semibold mb-4">Recent Activity</h3>
+        <div id="recentActivity" class="space-y-3">
+          <div class="text-gray-400 text-sm">No recent activity</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signals Section -->
+    <div id="signalsSection" class="hidden max-w-7xl mx-auto px-4 py-8">
+      <div class="mb-8 flex items-center justify-between">
+        <div>
+          <h2 class="text-3xl font-bold mb-2">Trading Signals</h2>
+          <p class="text-gray-400">Top crypto signals from the community and AI</p>
+        </div>
+        <button onclick="showCreateSignal()" class="px-6 py-3 gradient-bg rounded-lg font-semibold hover:opacity-90 transition">
+          + Create Signal
+        </button>
+      </div>
+
+      <!-- Signal Filters -->
+      <div class="flex space-x-4 mb-6 overflow-x-auto">
+        <button onclick="filterSignals('all')" class="px-4 py-2 glass rounded-lg hover:bg-white/10 transition whitespace-nowrap tab-active" data-filter="all">All Signals</button>
+        <button onclick="filterSignals('long')" class="px-4 py-2 glass rounded-lg hover:bg-white/10 transition whitespace-nowrap" data-filter="long">Long Only</button>
+        <button onclick="filterSignals('short')" class="px-4 py-2 glass rounded-lg hover:bg-white/10 transition whitespace-nowrap" data-filter="short">Short Only</button>
+        <button onclick="filterSignals('following')" class="px-4 py-2 glass rounded-lg hover:bg-white/10 transition whitespace-nowrap" data-filter="following">Following</button>
+      </div>
+
+      <!-- Signals Grid -->
+      <div id="signalsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="text-center text-gray-400 py-8">Loading signals...</div>
+      </div>
+    </div>
+
+    <!-- Community Section -->
+    <div id="communitySection" class="hidden max-w-7xl mx-auto px-4 py-8">
+      <div class="mb-8">
+        <h2 class="text-3xl font-bold mb-2">Community Feed</h2>
+        <p class="text-gray-400">Share ideas and learn from top traders</p>
+      </div>
+
+      <!-- Create Post -->
+      <div class="glass rounded-xl p-6 mb-6">
+        <form id="createPostForm" class="space-y-4">
+          <input type="text" id="postTitle" placeholder="What's your trading idea?" class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition">
+          <textarea id="postContent" rows="3" placeholder="Share your analysis..." class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition resize-none"></textarea>
+          <div class="flex items-center justify-between">
+            <div class="flex space-x-4">
+              <input type="text" id="postSymbol" placeholder="Symbol (e.g., BTC)" class="px-4 py-2 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none transition w-32">
+              <select id="postType" class="px-4 py-2 bg-white/5 border border-gray-700 rounded-lg focus:border-purple-500 focus:outline-none">
+                <option value="long">Long</option>
+                <option value="short">Short</option>
+                <option value="neutral">Neutral</option>
+              </select>
+            </div>
+            <button type="submit" class="px-6 py-2 gradient-bg rounded-lg font-semibold hover:opacity-90 transition">Post</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Community Posts -->
+      <div id="communityPosts" class="space-y-6">
+        <div class="text-center text-gray-400 py-8">Loading posts...</div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Section -->
+    <div id="leaderboardSection" class="hidden max-w-7xl mx-auto px-4 py-8">
+      <div class="mb-8">
+        <h2 class="text-3xl font-bold mb-2">Top Traders</h2>
+        <p class="text-gray-400">Follow the best performers in the community</p>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-white/5">
+              <tr>
+                <th class="px-6 py-4 text-left text-sm font-semibold">Rank</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold">Trader</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold">Win Rate</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold">Signals</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold">Followers</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold">Action</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+              <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-gray-400">Loading leaderboard...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Section -->
+    <div id="profileSection" class="hidden max-w-4xl mx-auto px-4 py-8">
+      <div class="glass rounded-xl p-8">
+        <div class="flex items-center space-x-6 mb-8">
+          <div class="avatar gradient-bg text-4xl w-24 h-24" id="profileAvatar">U</div>
+          <div class="flex-1">
+            <h2 class="text-2xl font-bold mb-2" id="profileUsername">Username</h2>
+            <p class="text-gray-400 mb-3" id="profileEmail">email@example.com</p>
+            <div class="flex space-x-4">
+              <div class="text-center">
+                <div class="text-xl font-bold" id="profileSignals">0</div>
+                <div class="text-xs text-gray-400">Signals</div>
+              </div>
+              <div class="text-center">
+                <div class="text-xl font-bold" id="profileFollowers">0</div>
+                <div class="text-xs text-gray-400">Followers</div>
+              </div>
+              <div class="text-center">
+                <div class="text-xl font-bold" id="profileFollowing">0</div>
+                <div class="text-xs text-gray-400">Following</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="glass rounded-xl p-6">
+            <h3 class="text-xl font-semibold mb-3">About</h3>
+            <p class="text-gray-400 text-sm" id="profileBio">
+              No bio added yet.
+            </p>
+          </div>
+
+          <div class="glass rounded-xl p-6">
+            <h3 class="text-xl font-semibold mb-3">Performance</h3>
+            <div class="text-gray-400 text-sm">Win Rate</div>
+            <div class="text-2xl font-bold mt-1" id="profileWinRate">0%</div>
+          </div>
+        </div>
+
+        <!-- User Signals -->
+        <div class="glass rounded-xl p-6">
+          <h3 class="text-xl font-semibold mb-4">Your Signals</h3>
+          <div id="profileSignalsList" class="space-y-4">
+            <div class="text-gray-400 text-center text-sm">No signals created yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div> <!-- End Main App -->
+
+
+  <!-- Create Signal Modal -->
+  <div id="createSignalModal" class="modal">
+    <div class="glass rounded-xl p-8 w-full max-w-lg">
+      <h3 class="text-2xl font-bold mb-6">Create Trading Signal</h3>
+
+      <form id="createSignalForm" class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Symbol</label>
+          <input id="signalSymbol" type="text" class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg" placeholder="BTC, ETH, SOL...">
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Type</label>
+          <select id="signalType" class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg">
+            <option value="long">Long</option>
+            <option value="short">Short</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Entry Price</label>
+          <input id="signalEntry" type="number" step="0.0001" class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Take Profit</label>
+            <input id="signalTP" type="number" step="0.0001" class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Stop Loss</label>
+            <input id="signalSL" type="number" step="0.0001" class="w-full px-4 py-3 bg-white/5 border border-gray-700 rounded-lg">
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-4 mt-6">
+          <button type="button" onclick="closeCreateSignal()" class="px-5 py-2 bg-white/10 rounded-lg">Cancel</button>
+          <button type="submit" class="px-5 py-2 gradient-bg rounded-lg font-semibold">Publish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notifications Dropdown -->
+  <div id="notificationsPanel" class="hidden glass rounded-xl p-4 notification w-80">
+    <h4 class="font-semibold text-lg mb-3">Notifications</h4>
+    <div id="notificationsList" class="space-y-3 text-sm text-gray-300">
+      <div class="text-gray-400">No notifications</div>
+    </div>
+  </div>
+
+
+  <!-- Scripts -->
+  <script>
+    // Basic navigation handler
+    function showSection(sectionId) {
+      const secs = [
+        "dashboardSection", "signalsSection", "communitySection",
+        "leaderboardSection", "profileSection"
+      ];
+      secs.forEach(sec => {
+        document.getElementById(sec).classList.add("hidden");
+      });
+      document.getElementById(sectionId + "Section").classList.remove("hidden");
+      window.scrollTo(0, 0);
+    }
+
+    // Placeholder — hook your backend logic
+    function logout() {
+      localStorage.removeItem("user");
+      location.reload();
+    }
+
+    function showNotifications() {
+      const panel = document.getElementById("notificationsPanel");
+      panel.classList.toggle("hidden");
+    }
+
+    function showCreateSignal() {
+      document.getElementById("createSignalModal").classList.add("show");
+    }
+
+    function closeCreateSignal() {
+      document.getElementById("createSignalModal").classList.remove("show");
+    }
+
+    // Example submit handler
+    document.getElementById("createSignalForm").addEventListener("submit", e => {
+      e.preventDefault();
+      closeCreateSignal();
+      alert("Signal created (hook to backend)");
+    });
+  </script>
+
+</body>
+</html>
